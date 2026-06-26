@@ -1,0 +1,108 @@
+cd C:\Users\bibon\PycharmProjects\plagiarism_checker\frontend
+
+@'
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Прокси для бэкенда</title>
+    <style>
+        body { font-family: Arial; padding: 20px; max-width: 600px; margin: 0 auto; }
+        .success { color: green; }
+        .error { color: red; }
+        textarea { width: 100%; height: 200px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h1> Прокси для бэкенда</h1>
+    <p>Проверка связи с бэкендом:</p>
+    <button onclick="checkHealth()">Проверить /health</button>
+    <button onclick="checkDocuments()">Проверить /api/documents</button>
+    <div id="result" style="margin-top:20px;padding:15px;background:#f5f5f5;border-radius:5px;">
+        Нажми кнопку для проверки
+    </div>
+    <hr>
+    <h3>📤 Тест загрузки файла</h3>
+    <input type="file" id="fileInput">
+    <button onclick="uploadFile()">Загрузить</button>
+    <div id="uploadResult" style="margin-top:10px;padding:15px;background:#f5f5f5;border-radius:5px;"></div>
+
+    <script>
+        const API_URL = 'https://MisMath27.pythonanywhere.com';
+
+        function showResult(text, isSuccess) {
+            const result = document.getElementById('result');
+            result.innerHTML = text;
+            result.style.background = isSuccess ? '#e8f5e9' : '#ffebee';
+            result.style.color = isSuccess ? 'green' : 'red';
+        }
+
+        async function checkHealth() {
+            showResult(' Проверка...', true);
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                const data = await response.json();
+                showResult(' Успех! /health отвечает:\n' + JSON.stringify(data, null, 2), true);
+            } catch (error) {
+                showResult(' Ошибка: ' + error.message, false);
+            }
+        }
+
+        async function checkDocuments() {
+            showResult('⏳ Проверка...', true);
+            try {
+                const response = await fetch(`${API_URL}/api/documents`);
+                const data = await response.json();
+                showResult(' Успех! /api/documents отвечает:\n' + JSON.stringify(data, null, 2), true);
+            } catch (error) {
+                showResult(' Ошибка: ' + error.message, false);
+            }
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const resultDiv = document.getElementById('uploadResult');
+
+            if (!fileInput.files.length) {
+                resultDiv.innerHTML = ' Выберите файл!';
+                resultDiv.style.background = '#ffebee';
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('file_type', 'document');
+
+            resultDiv.innerHTML = '⏳ Загрузка...';
+            resultDiv.style.background = '#fff3e0';
+
+            try {
+                const response = await fetch(`${API_URL}/api/upload/file`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    resultDiv.innerHTML = ' Успех! Файл загружен:\n' + JSON.stringify(data, null, 2);
+                    resultDiv.style.background = '#e8f5e9';
+                    resultDiv.style.color = 'green';
+                } else {
+                    resultDiv.innerHTML = ' Ошибка: ' + JSON.stringify(data, null, 2);
+                    resultDiv.style.background = '#ffebee';
+                    resultDiv.style.color = 'red';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = ' Ошибка: ' + error.message;
+                resultDiv.style.background = '#ffebee';
+                resultDiv.style.color = 'red';
+            }
+        }
+
+        console.log(' Прокси загружен!');
+        console.log(` API URL: ${API_URL}`);
+    </script>
+</body>
+</html>
+'@ | Out-File -FilePath "proxy.html" -Encoding utf8
