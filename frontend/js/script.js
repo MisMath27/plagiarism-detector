@@ -1,6 +1,13 @@
+// ============================================================
+// 🔧 ДЕМО-РЕЖИМ (РАБОТАЕТ БЕЗ БЭКЕНДА)
+// ============================================================
 
+const DEMO_MODE = true;
+let history = JSON.parse(localStorage.getItem('history') || '[]');
 
-const API_URL = 'https://cors-anywhere.herokuapp.com/https://MisMath27.pythonanywhere.com';
+// ============================================================
+// DOM ЭЛЕМЕНТЫ
+// ============================================================
 
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
@@ -17,7 +24,10 @@ const resultsSection = document.getElementById('results');
 const historyList = document.getElementById('historyList');
 
 let selectedFile = null;
-let currentReportId = null;
+
+// ============================================================
+// 🖱️ DRAG & DROP
+// ============================================================
 
 dropZone.addEventListener('dragover', (e) => {
     e.preventDefault();
@@ -36,6 +46,10 @@ dropZone.addEventListener('drop', (e) => {
     }
 });
 
+// ============================================================
+// 📁 ВЫБОР ФАЙЛА
+// ============================================================
+
 fileSelect.addEventListener('click', (e) => {
     e.preventDefault();
     fileInput.click();
@@ -50,17 +64,17 @@ fileInput.addEventListener('change', (e) => {
 function handleFileSelect(file) {
     const validExtensions = ['.txt', '.pdf', '.docx', '.doc', '.rtf'];
     const ext = '.' + file.name.split('.').pop().toLowerCase();
-    
+
     if (!validExtensions.includes(ext)) {
-        alert(' Неподдерживаемый формат. Поддерживаются: ' + validExtensions.join(', '));
+        alert('❌ Неподдерживаемый формат. Поддерживаются: ' + validExtensions.join(', '));
         return;
     }
-    
+
     if (file.size > 10 * 1024 * 1024) {
-        alert(' Файл слишком большой. Максимальный размер: 10MB');
+        alert('❌ Файл слишком большой. Максимальный размер: 10MB');
         return;
     }
-    
+
     selectedFile = file;
     fileName.textContent = file.name;
     fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
@@ -68,6 +82,9 @@ function handleFileSelect(file) {
     analyzeBtn.disabled = false;
 }
 
+// ============================================================
+// 🚀 АНАЛИЗ ФАЙЛА (ДЕМО)
+// ============================================================
 
 analyzeBtn.addEventListener('click', analyzeFile);
 
@@ -77,92 +94,69 @@ async function analyzeFile() {
     progressContainer.classList.add('active');
     analyzeBtn.disabled = true;
     resultsSection.style.display = 'none';
-    
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append('file_type', 'document');
-    
-    try {
-        let progress = 0;
-        const interval = setInterval(() => {
-            progress += Math.random() * 8 + 2;
-            if (progress > 90) progress = 90;
-            progressFill.style.width = progress + '%';
-            progressText.textContent = '⏳ Загрузка и анализ... ' + Math.round(progress) + '%';
-        }, 300);
 
-        const response = await fetch(`${API_URL}/api/upload/file`, {
-            method: 'POST',
-            body: formData
-        });
-        
-        clearInterval(interval);
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Ошибка сервера');
-        }
-        
-        const data = await response.json();
-        currentReportId = data.document_id;
+    // Прогресс
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += Math.random() * 8 + 2;
+        if (progress > 100) progress = 100;
+        progressFill.style.width = progress + '%';
+        progressText.textContent = '⏳ Анализ текста... ' + Math.round(progress) + '%';
+    }, 300);
 
-        if (data.is_duplicate) {
-            alert(`ℹ️ ${data.message}\nФайл уже был загружен: ${data.filename}`);
-        }
+    // Имитация задержки
+    await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 1500));
 
-        progressFill.style.width = '95%';
-        progressText.textContent = '🔍 Получение результатов...';
+    clearInterval(interval);
+    progressFill.style.width = '100%';
+    progressText.textContent = '✅ Анализ завершен!';
 
-        const plagResponse = await fetch(`${API_URL}/api/analysis/plagiarism/${data.document_id}`, {
-            method: 'POST'
-        });
+    // Генерируем результаты
+    const plagScore = Math.round(Math.random() * 35 + 60); // 60-95%
+    const aiScore = Math.round(Math.random() * 35 + 5);   // 5-40%
+    const uniquePhrases = Math.round(Math.random() * 30 + 65);
+    const sentences = Math.floor(Math.random() * 50 + 10);
+    const matchedSources = Math.floor(Math.random() * 6);
+    const readability = Math.round(Math.random() * 30 + 60);
+    const avgLength = (Math.random() * 10 + 8).toFixed(1);
 
-        const aiResponse = await fetch(`${API_URL}/api/analysis/ai-detection/${data.document_id}`, {
-            method: 'POST'
-        });
-        
-        const plagData = plagResponse.ok ? await plagResponse.json() : null;
-        const aiData = aiResponse.ok ? await aiResponse.json() : null;
-        
-        progressFill.style.width = '100%';
-        progressText.textContent = '✅ Анализ завершен!';
-
-        setTimeout(() => {
-            progressContainer.classList.remove('active');
-            displayResults(data, plagData, aiData);
-            loadHistory();
-        }, 500);
-        
-    } catch (error) {
+    setTimeout(() => {
         progressContainer.classList.remove('active');
         analyzeBtn.disabled = false;
-        alert('❌ Ошибка: ' + error.message);
-        console.error('Error:', error);
-    }
+        displayResults(plagScore, aiScore, uniquePhrases, sentences, matchedSources, readability, avgLength);
+        saveToHistory(selectedFile.name, plagScore, aiScore);
+        loadHistory();
+    }, 500);
 }
 
+// ============================================================
+// 📊 ОТОБРАЖЕНИЕ РЕЗУЛЬТАТОВ
+// ============================================================
 
-function displayResults(uploadData, plagData, aiData) {
+function displayResults(plagScore, aiScore, uniquePhrases, sentences, matchedSources, readability, avgLength) {
     resultsSection.style.display = 'block';
     resultsSection.scrollIntoView({ behavior: 'smooth' });
 
-    const plagScore = plagData ? Math.round(100 - plagData.similarity_score) : Math.round(Math.random() * 30 + 70);
+    // Плагиат
     document.getElementById('plagiarismScore').textContent = plagScore + '%';
     document.getElementById('plagiarismBar').style.width = plagScore + '%';
-    document.getElementById('uniquePhrases').textContent = plagData ? plagData.unique_phrases_percentage + '%' : Math.round(Math.random() * 30 + 70) + '%';
-    document.getElementById('sentencesCount').textContent = plagData ? plagData.total_sentences : Math.floor(Math.random() * 50 + 10);
-    document.getElementById('matchedSources').textContent = plagData ? plagData.matched_sources?.length || 0 : Math.floor(Math.random() * 5);
+    document.getElementById('uniquePhrases').textContent = uniquePhrases + '%';
+    document.getElementById('sentencesCount').textContent = sentences;
+    document.getElementById('matchedSources').textContent = matchedSources;
 
-    const aiScore = aiData ? Math.round(aiData.ai_probability) : Math.round(Math.random() * 30);
+    // ИИ
     document.getElementById('aiScore').textContent = aiScore + '%';
     document.getElementById('aiBar').style.width = aiScore + '%';
-    document.getElementById('confidenceLevel').textContent = aiData ? aiData.confidence_level : (aiScore > 50 ? 'Высокая' : 'Низкая');
-    document.getElementById('readabilityScore').textContent = aiData ? aiData.readability_score + '%' : Math.round(Math.random() * 30 + 70) + '%';
-    document.getElementById('suspiciousPatterns').textContent = aiData && aiData.suspicious_patterns?.length > 0 ? 'Обнаружены: ' + aiData.suspicious_patterns.join(', ') : 'Не обнаружены';
-    document.getElementById('avgSentenceLength').textContent = aiData ? aiData.avg_sentence_length : (Math.random() * 10 + 10).toFixed(1);
+    document.getElementById('confidenceLevel').textContent = aiScore > 35 ? 'Средняя' : 'Низкая';
+    document.getElementById('readabilityScore').textContent = readability + '%';
+    document.getElementById('suspiciousPatterns').textContent = aiScore > 30 ? 'Обнаружены' : 'Не обнаружены';
+    document.getElementById('avgSentenceLength').textContent = avgLength;
 
-    document.getElementById('textPreview').textContent = uploadData.content_preview || 'Текст успешно загружен и проанализирован.';
+    // Превью
+    document.getElementById('textPreview').textContent =
+        '📄 Текст успешно проанализирован. Результаты проверки на плагиат и ИИ представлены выше.';
 
+    // Статусы
     const plagStatus = document.getElementById('plagiarismStatus');
     if (plagScore > 80) {
         plagStatus.innerHTML = '<span class="badge badge-success">✅ Высокая уникальность</span>';
@@ -171,7 +165,7 @@ function displayResults(uploadData, plagData, aiData) {
     } else {
         plagStatus.innerHTML = '<span class="badge badge-danger">❌ Низкая уникальность</span>';
     }
-    
+
     const aiStatus = document.getElementById('aiStatus');
     if (aiScore < 30) {
         aiStatus.innerHTML = '<span class="badge badge-success">✅ Написано человеком</span>';
@@ -182,47 +176,52 @@ function displayResults(uploadData, plagData, aiData) {
     }
 }
 
+// ============================================================
+// 📜 ИСТОРИЯ
+// ============================================================
 
-async function loadHistory() {
-    try {
-        const response = await fetch(`${API_URL}/api/documents`);
-        if (!response.ok) throw new Error('Ошибка загрузки истории');
-        
-        const data = await response.json();
-        
-        if (data.length === 0) {
-            historyList.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-inbox empty-icon"></i>
-                    <p>Пока нет проверок</p>
-                    <p class="empty-sub">Загрузите файл для начала</p>
-                </div>
-            `;
-            return;
-        }
-        
-        historyList.innerHTML = data.map(item => `
-            <div class="history-item">
-                <div>
-                    <div class="file-name">${item.filename}</div>
-                    <div style="display: flex; gap: 10px; align-items: center; margin-top: 4px;">
-                        <span class="file-date">${new Date(item.uploaded_at).toLocaleString('ru-RU')}</span>
-                        <span class="file-type">${item.file_type || 'Документ'}</span>
-                        <span class="file-words">📄 ${item.word_count || 0} слов</span>
-                    </div>
-                </div>
-                <div class="scores">
-                    <span class="score score-plagiarism">${Math.round(Math.random() * 30 + 70)}%</span>
-                    <span class="score score-ai">${Math.round(Math.random() * 30)}%</span>
-                </div>
-            </div>
-        `).join('');
-        
-    } catch (error) {
-        console.error('Ошибка загрузки истории:', error);
-    }
+function saveToHistory(filename, plagScore, aiScore) {
+    history.unshift({
+        filename: filename,
+        date: new Date().toLocaleString('ru-RU'),
+        plagScore: plagScore,
+        aiScore: aiScore
+    });
+    if (history.length > 50) history = history.slice(0, 50);
+    localStorage.setItem('history', JSON.stringify(history));
 }
 
+function loadHistory() {
+    if (history.length === 0) {
+        historyList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-inbox empty-icon"></i>
+                <p>Пока нет проверок</p>
+                <p class="empty-sub">Загрузите файл для начала</p>
+            </div>
+        `;
+        return;
+    }
+
+    historyList.innerHTML = history.map(item => `
+        <div class="history-item">
+            <div>
+                <div class="file-name">${item.filename}</div>
+                <div style="display: flex; gap: 10px; align-items: center; margin-top: 4px;">
+                    <span class="file-date">${item.date}</span>
+                </div>
+            </div>
+            <div class="scores">
+                <span class="score score-plagiarism">🟢 ${item.plagScore}%</span>
+                <span class="score score-ai">🤖 ${item.aiScore}%</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ============================================================
+// 🧹 ОЧИСТКА
+// ============================================================
 
 clearBtn.addEventListener('click', () => {
     selectedFile = null;
@@ -241,10 +240,18 @@ document.getElementById('newCheckBtn').addEventListener('click', () => {
     progressContainer.classList.remove('active');
 });
 
+document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+    if (confirm('Очистить всю историю?')) {
+        history = [];
+        localStorage.setItem('history', JSON.stringify(history));
+        loadHistory();
+    }
+});
+
+// ============================================================
+// 🚀 ЗАПУСК
+// ============================================================
 
 loadHistory();
-
-setInterval(loadHistory, 30000);
-
-console.log('✅ Plagiarism & AI Detector загружен!');
-console.log(`🌐 API URL: ${API_URL}`);
+console.log('✅ Plagiarism & AI Detector (ДЕМО-РЕЖИМ) загружен!');
+console.log('📊 Результаты генерируются случайно для демонстрации');
