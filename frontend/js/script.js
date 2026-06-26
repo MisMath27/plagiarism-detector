@@ -2,12 +2,7 @@
 // 🔧 ДЕМО-РЕЖИМ (РАБОТАЕТ БЕЗ БЭКЕНДА)
 // ============================================================
 
-const DEMO_MODE = true;
 let history = JSON.parse(localStorage.getItem('history') || '[]');
-
-// ============================================================
-// DOM ЭЛЕМЕНТЫ
-// ============================================================
 
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
@@ -25,10 +20,6 @@ const historyList = document.getElementById('historyList');
 
 let selectedFile = null;
 
-// ============================================================
-// 🖱️ DRAG & DROP
-// ============================================================
-
 dropZone.addEventListener('dragover', (e) => {
     e.preventDefault();
     dropZone.classList.add('dragover');
@@ -45,10 +36,6 @@ dropZone.addEventListener('drop', (e) => {
         handleFileSelect(e.dataTransfer.files[0]);
     }
 });
-
-// ============================================================
-// 📁 ВЫБОР ФАЙЛА
-// ============================================================
 
 fileSelect.addEventListener('click', (e) => {
     e.preventDefault();
@@ -82,10 +69,6 @@ function handleFileSelect(file) {
     analyzeBtn.disabled = false;
 }
 
-// ============================================================
-// 🚀 АНАЛИЗ ФАЙЛА (ДЕМО)
-// ============================================================
-
 analyzeBtn.addEventListener('click', analyzeFile);
 
 async function analyzeFile() {
@@ -95,7 +78,6 @@ async function analyzeFile() {
     analyzeBtn.disabled = true;
     resultsSection.style.display = 'none';
 
-    // Прогресс
     let progress = 0;
     const interval = setInterval(() => {
         progress += Math.random() * 8 + 2;
@@ -104,16 +86,14 @@ async function analyzeFile() {
         progressText.textContent = '⏳ Анализ текста... ' + Math.round(progress) + '%';
     }, 300);
 
-    // Имитация задержки
     await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 1500));
 
     clearInterval(interval);
     progressFill.style.width = '100%';
     progressText.textContent = '✅ Анализ завершен!';
 
-    // Генерируем результаты
-    const plagScore = Math.round(Math.random() * 35 + 60); // 60-95%
-    const aiScore = Math.round(Math.random() * 35 + 5);   // 5-40%
+    const plagScore = Math.round(Math.random() * 35 + 60);
+    const aiScore = Math.round(Math.random() * 35 + 5);
     const uniquePhrases = Math.round(Math.random() * 30 + 65);
     const sentences = Math.floor(Math.random() * 50 + 10);
     const matchedSources = Math.floor(Math.random() * 6);
@@ -129,22 +109,16 @@ async function analyzeFile() {
     }, 500);
 }
 
-// ============================================================
-// 📊 ОТОБРАЖЕНИЕ РЕЗУЛЬТАТОВ
-// ============================================================
-
 function displayResults(plagScore, aiScore, uniquePhrases, sentences, matchedSources, readability, avgLength) {
     resultsSection.style.display = 'block';
     resultsSection.scrollIntoView({ behavior: 'smooth' });
 
-    // Плагиат
     document.getElementById('plagiarismScore').textContent = plagScore + '%';
     document.getElementById('plagiarismBar').style.width = plagScore + '%';
     document.getElementById('uniquePhrases').textContent = uniquePhrases + '%';
     document.getElementById('sentencesCount').textContent = sentences;
     document.getElementById('matchedSources').textContent = matchedSources;
 
-    // ИИ
     document.getElementById('aiScore').textContent = aiScore + '%';
     document.getElementById('aiBar').style.width = aiScore + '%';
     document.getElementById('confidenceLevel').textContent = aiScore > 35 ? 'Средняя' : 'Низкая';
@@ -152,11 +126,9 @@ function displayResults(plagScore, aiScore, uniquePhrases, sentences, matchedSou
     document.getElementById('suspiciousPatterns').textContent = aiScore > 30 ? 'Обнаружены' : 'Не обнаружены';
     document.getElementById('avgSentenceLength').textContent = avgLength;
 
-    // Превью
     document.getElementById('textPreview').textContent =
         '📄 Текст успешно проанализирован. Результаты проверки на плагиат и ИИ представлены выше.';
 
-    // Статусы
     const plagStatus = document.getElementById('plagiarismStatus');
     if (plagScore > 80) {
         plagStatus.innerHTML = '<span class="badge badge-success">✅ Высокая уникальность</span>';
@@ -175,10 +147,6 @@ function displayResults(plagScore, aiScore, uniquePhrases, sentences, matchedSou
         aiStatus.innerHTML = '<span class="badge badge-danger">❌ Высокая вероятность ИИ</span>';
     }
 }
-
-// ============================================================
-// 📜 ИСТОРИЯ
-// ============================================================
 
 function saveToHistory(filename, plagScore, aiScore) {
     history.unshift({
@@ -219,10 +187,6 @@ function loadHistory() {
     `).join('');
 }
 
-// ============================================================
-// 🧹 ОЧИСТКА
-// ============================================================
-
 clearBtn.addEventListener('click', () => {
     selectedFile = null;
     fileInfo.style.display = 'none';
@@ -247,10 +211,6 @@ document.getElementById('clearHistoryBtn').addEventListener('click', () => {
         loadHistory();
     }
 });
-
-// ============================================================
-// 🚀 ЗАПУСК
-// ============================================================
 
 loadHistory();
 console.log('✅ Plagiarism & AI Detector (ДЕМО-РЕЖИМ) загружен!');
