@@ -1,190 +1,207 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <title>Проверка на плагиат</title>
-    <style>
-        body { font-family: Arial; padding: 20px; max-width: 600px; margin: 0 auto; }
-        .drop-zone { border: 2px dashed #ccc; padding: 40px; text-align: center; border-radius: 10px; cursor: pointer; }
-        .drop-zone.dragover { border-color: #4CAF50; background: #f0f8f0; }
-        button { background: #4CAF50; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
-        button:disabled { opacity: 0.5; }
-        #result { margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 5px; display: none; }
-        .file-info { margin-top: 10px; padding: 10px; background: #e3f2fd; border-radius: 5px; }
-        .progress { width: 100%; height: 20px; background: #ddd; border-radius: 10px; overflow: hidden; margin-top: 10px; display: none; }
-        .progress-bar { height: 100%; width: 0%; background: #4CAF50; transition: width 0.5s; }
-        .error { color: red; }
-        .success { color: green; }
-    </style>
+    <meta name="yandex-verification" content="8ca542c0266e3979" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Проверка на плагиат и ИИ</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 </head>
 <body>
-    <h1>🔍 Проверка на плагиат и ИИ</h1>
+    <header class="header">
+        <div class="container header-content">
+            <div class="logo">
+                <i class="fas fa-shield-alt"></i>
+                <h1>Plagiarism & AI Detector</h1>
+            </div>
+            <nav class="nav">
+                <a href="#upload" class="nav-link active">Проверка</a>
+                <a href="#history" class="nav-link">История</a>
+                <a href="#about" class="nav-link">О сервисе</a>
+            </nav>
+        </div>
+    </header>
 
-    <div class="drop-zone" id="dropZone">
-        <p>📁 Перетащите файл сюда или нажмите для выбора</p>
-        <input type="file" id="fileInput" accept=".txt,.pdf,.docx,.doc,.rtf" style="display:none">
-    </div>
+    <main>
+        <section id="upload" class="upload-section">
+            <div class="container">
+                <div class="upload-card">
+                    <div class="upload-header">
+                        <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                        <h2>Загрузите файл для проверки</h2>
+                        <p class="upload-subtitle">Поддерживаемые форматы: TXT, PDF, DOCX, DOC, RTF</p>
+                    </div>
 
-    <div class="file-info" id="fileInfo" style="display:none">
-        <strong>Файл:</strong> <span id="fileName"></span> (<span id="fileSize"></span>)
-    </div>
+                    <div class="drop-zone" id="dropZone">
+                        <div class="drop-zone-content">
+                            <i class="fas fa-file-upload drop-icon"></i>
+                            <p>Перетащите файл сюда или <span class="file-link" id="fileSelect">выберите файл</span></p>
+                            <input type="file" id="fileInput" accept=".txt,.pdf,.docx,.doc,.rtf" />
+                            <div class="file-info" id="fileInfo" style="display: none;">
+                                <i class="fas fa-file"></i>
+                                <span id="fileName"></span>
+                                <span id="fileSize"></span>
+                            </div>
+                        </div>
+                    </div>
 
-    <div style="margin-top: 15px;">
-        <button id="analyzeBtn" disabled>🚀 Начать анализ</button>
-        <button id="clearBtn" style="background:#999;">🗑️ Очистить</button>
-    </div>
+                    <div class="upload-actions">
+                        <button class="btn btn-primary" id="analyzeBtn" disabled>
+                            <i class="fas fa-microscope"></i> Начать анализ
+                        </button>
+                        <button class="btn btn-secondary" id="clearBtn">
+                            <i class="fas fa-undo"></i> Очистить
+                        </button>
+                    </div>
 
-    <div class="progress" id="progressContainer">
-        <div class="progress-bar" id="progressFill"></div>
-    </div>
+                    <div class="progress-container" id="progressContainer" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <p class="progress-text" id="progressText">Анализ текста...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-    <div id="result"></div>
+        <section id="results" class="results-section" style="display: none;">
+            <div class="container">
+                <div class="results-card">
+                    <div class="results-header">
+                        <h2><i class="fas fa-chart-bar"></i> Результаты проверки</h2>
+                        <div class="results-actions">
+                            <button class="btn btn-success" id="downloadPdfBtn">
+                                <i class="fas fa-file-pdf"></i> Скачать PDF
+                            </button>
+                            <button class="btn btn-secondary" id="newCheckBtn">
+                                <i class="fas fa-plus"></i> Новая проверка
+                            </button>
+                        </div>
+                    </div>
 
-    <script>
-        const API_URL = 'https://MisMath27.pythonanywhere.com';
+                    <div class="results-grid">
+                        <div class="result-card plagiarism-card">
+                            <div class="result-icon">
+                                <i class="fas fa-copy"></i>
+                            </div>
+                            <h3>Оригинальность текста</h3>
+                            <div class="result-score" id="plagiarismScore">0%</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="plagiarismBar"></div>
+                            </div>
+                            <div class="result-status" id="plagiarismStatus">
+                                <span class="badge badge-warning">Ожидание</span>
+                            </div>
+                            <div class="result-details">
+                                <span>Уникальных фраз: <strong id="uniquePhrases">0%</strong></span>
+                                <span>Предложений: <strong id="sentencesCount">0</strong></span>
+                            </div>
+                        </div>
 
-        let selectedFile = null;
-        const dropZone = document.getElementById('dropZone');
-        const fileInput = document.getElementById('fileInput');
-        const fileInfo = document.getElementById('fileInfo');
-        const fileName = document.getElementById('fileName');
-        const fileSize = document.getElementById('fileSize');
-        const analyzeBtn = document.getElementById('analyzeBtn');
-        const clearBtn = document.getElementById('clearBtn');
-        const progressContainer = document.getElementById('progressContainer');
-        const progressFill = document.getElementById('progressFill');
-        const resultDiv = document.getElementById('result');
+                        <div class="result-card ai-card">
+                            <div class="result-icon">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <h3>Вероятность использования ИИ</h3>
+                            <div class="result-score" id="aiScore">0%</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="aiBar"></div>
+                            </div>
+                            <div class="result-status" id="aiStatus">
+                                <span class="badge badge-warning">Ожидание</span>
+                            </div>
+                            <div class="result-details">
+                                <span>Уверенность: <strong id="confidenceLevel">-</strong></span>
+                                <span>Читаемость: <strong id="readabilityScore">-</strong></span>
+                            </div>
+                        </div>
+                    </div>
 
-        dropZone.addEventListener('click', () => fileInput.click());
+                    <div class="detailed-analysis">
+                        <h3><i class="fas fa-list-ul"></i> Детальный анализ</h3>
+                        <div class="analysis-details" id="analysisDetails">
+                            <div class="detail-item">
+                                <span class="detail-label"> Найдено совпадений:</span>
+                                <span class="detail-value" id="matchedSources">0</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label"> Подозрительные паттерны:</span>
+                                <span class="detail-value" id="suspiciousPatterns">Нет</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label"> Средняя длина предложения:</span>
+                                <span class="detail-value" id="avgSentenceLength">0</span>
+                            </div>
+                        </div>
+                    </div>
 
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('dragover');
-        });
+                    <div class="text-preview">
+                        <h3><i class="fas fa-align-left"></i> Превью текста</h3>
+                        <div class="preview-content" id="textPreview"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('dragover');
-        });
+        <section id="history" class="history-section">
+            <div class="container">
+                <div class="history-card">
+                    <div class="history-header">
+                        <h2><i class="fas fa-history"></i> История проверок</h2>
+                        <button class="btn btn-danger" id="clearHistoryBtn">
+                            <i class="fas fa-trash"></i> Очистить историю
+                        </button>
+                    </div>
+                    <div class="history-list" id="historyList">
+                        <div class="empty-state">
+                            <i class="fas fa-inbox empty-icon"></i>
+                            <p>Пока нет проверок</p>
+                            <p class="empty-sub">Загрузите файл для начала</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('dragover');
-            if (e.dataTransfer.files.length) {
-                handleFile(e.dataTransfer.files[0]);
-            }
-        });
+        <section id="about" class="about-section">
+            <div class="container">
+                <div class="about-card">
+                    <h2><i class="fas fa-info-circle"></i> О сервисе</h2>
+                    <div class="about-grid">
+                        <div class="about-item">
+                            <i class="fas fa-shield-alt"></i>
+                            <h3>Проверка на плагиат</h3>
+                            <p>Анализирует текст на уникальность и находит совпадения с другими источниками</p>
+                        </div>
+                        <div class="about-item">
+                            <i class="fas fa-brain"></i>
+                            <h3>Обнаружение ИИ</h3>
+                            <p>Определяет вероятность того, что текст был создан искусственным интеллектом</p>
+                        </div>
+                        <div class="about-item">
+                            <i class="fas fa-file-alt"></i>
+                            <h3>Поддержка форматов</h3>
+                            <p>Работает с TXT, PDF, DOCX, DOC, RTF файлами</p>
+                        </div>
+                        <div class="about-item">
+                            <i class="fas fa-chart-line"></i>
+                            <h3>Детальный отчет</h3>
+                            <p>Предоставляет подробный анализ с возможностью скачать PDF</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
 
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length) {
-                handleFile(e.target.files[0]);
-            }
-        });
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2026 Plagiarism & AI Detector. Все права защищены.</p>
+            <p class="footer-version">Версия 2.0.0</p>
+        </div>
+    </footer>
 
-        function handleFile(file) {
-            const valid = ['.txt','.pdf','.docx','.doc','.rtf'];
-            const ext = '.' + file.name.split('.').pop().toLowerCase();
-            if (!valid.includes(ext)) {
-                alert('Неподдерживаемый формат!');
-                return;
-            }
-            selectedFile = file;
-            fileName.textContent = file.name;
-            fileSize.textContent = (file.size/1024).toFixed(1) + ' KB';
-            fileInfo.style.display = 'block';
-            analyzeBtn.disabled = false;
-            resultDiv.style.display = 'none';
-        }
-
-        clearBtn.addEventListener('click', () => {
-            selectedFile = null;
-            fileInfo.style.display = 'none';
-            analyzeBtn.disabled = true;
-            progressContainer.style.display = 'none';
-            resultDiv.style.display = 'none';
-            fileInput.value = '';
-        });
-
-        analyzeBtn.addEventListener('click', async () => {
-            if (!selectedFile) return;
-
-            analyzeBtn.disabled = true;
-            progressContainer.style.display = 'block';
-            progressFill.style.width = '0%';
-            resultDiv.style.display = 'none';
-
-            const formData = new FormData();
-            formData.append('file', selectedFile);
-            formData.append('file_type', 'document');
-
-            try {
-                // Прогресс
-                let progress = 0;
-                const interval = setInterval(() => {
-                    progress += Math.random() * 10;
-                    if (progress > 90) progress = 90;
-                    progressFill.style.width = progress + '%';
-                }, 300);
-
-                // Отправляем
-                const response = await fetch(`${API_URL}/api/upload/file`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                clearInterval(interval);
-                progressFill.style.width = '100%';
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || error.error || 'Ошибка сервера');
-                }
-
-                const data = await response.json();
-                const docId = data.document_id;
-
-                // Проверка на плагиат
-                const plagResponse = await fetch(`${API_URL}/api/analysis/plagiarism/${docId}`, {
-                    method: 'POST'
-                });
-                const plagData = plagResponse.ok ? await plagResponse.json() : null;
-
-                // Проверка на ИИ
-                const aiResponse = await fetch(`${API_URL}/api/analysis/ai-detection/${docId}`, {
-                    method: 'POST'
-                });
-                const aiData = aiResponse.ok ? await aiResponse.json() : null;
-
-                const plagScore = plagData ? Math.round(100 - plagData.similarity_score) : 85;
-                const aiScore = aiData ? Math.round(aiData.ai_probability) : 15;
-
-                resultDiv.innerHTML = `
-                    <h3>📊 Результаты</h3>
-                    <p><strong>📄 Файл:</strong> ${data.filename}</p>
-                    <p><strong>📝 Слов:</strong> ${data.word_count || '100'}</p>
-                    <hr>
-                    <p><strong>🔍 Оригинальность:</strong> <span style="color:${plagScore > 70 ? 'green' : 'orange'}">${plagScore}%</span></p>
-                    <p><strong>🤖 Вероятность ИИ:</strong> <span style="color:${aiScore < 30 ? 'green' : 'orange'}">${aiScore}%</span></p>
-                    <p><strong>📅 Дата:</strong> ${new Date().toLocaleString('ru-RU')}</p>
-                    ${data.is_duplicate ? '<p style="color:orange;">⚠️ Файл уже загружен ранее</p>' : ''}
-                    <hr>
-                    <p style="font-size:14px;color:#666;">✅ Анализ завершен!</p>
-                `;
-                resultDiv.style.display = 'block';
-                resultDiv.style.background = '#f0f8f0';
-                resultDiv.style.padding = '15px';
-                resultDiv.style.borderRadius = '5px';
-
-            } catch (error) {
-                resultDiv.innerHTML = `<p style="color:red;">❌ Ошибка: ${error.message}</p>`;
-                resultDiv.style.display = 'block';
-                resultDiv.style.background = '#fff0f0';
-                resultDiv.style.padding = '15px';
-                resultDiv.style.borderRadius = '5px';
-            }
-
-            analyzeBtn.disabled = false;
-            setTimeout(() => { progressContainer.style.display = 'none'; }, 1000);
-        });
-    </script>
+    <script src="js/script.js"></script>
 </body>
 </html>
