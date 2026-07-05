@@ -2,7 +2,7 @@
 // 🔧 КОНФИГУРАЦИЯ
 // ============================================================
 
-const API_URL = 'https://MisMath27.pythonanywhere.com';
+const API_URL = 'http://localhost:8000';
 
 // ============================================================
 // DOM ЭЛЕМЕНТЫ
@@ -146,6 +146,7 @@ async function analyzeFile() {
 
         setTimeout(() => {
             progressContainer.classList.remove('active');
+            analyzeBtn.disabled = false;
             displayResults(data, plagData, aiData);
             loadHistory();
         }, 500);
@@ -246,7 +247,9 @@ async function loadHistory() {
     }
 }
 
-============================================================
+// ============================================================
+// 🧹 ОЧИСТКА И НОВАЯ ПРОВЕРКА
+// ============================================================
 
 clearBtn.addEventListener('click', () => {
     selectedFile = null;
@@ -272,7 +275,10 @@ document.getElementById('clearHistoryBtn').addEventListener('click', () => {
         loadHistory();
     }
 });
-============================================================
+
+// ============================================================
+// 🚀 ЗАПУСК
+// ============================================================
 
 loadHistory();
 setInterval(loadHistory, 30000);
