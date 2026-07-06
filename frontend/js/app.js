@@ -1,7 +1,6 @@
 ﻿
 
-const API_URL = 'http://localhost:8000';
-
+const API_URL = 'https://MisMath27.pythonanywhere.com';
 
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
