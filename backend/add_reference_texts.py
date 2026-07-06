@@ -1,34 +1,63 @@
-import requests
+# backend/download_texts.py
+"""
+Скрипт для скачивания разнообразных текстов в базу данных
+Без категорий - просто большая коллекция текстов для сравнения
+"""
+
+import os
+import sys
 import hashlib
+import requests
 import time
-import xml.etree.ElementTree as ET
-from typing import List, Dict, Optional
+import re
+from datetime import datetime
+from typing import List, Optional
+
+# Добавляем путь к проекту
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from app.database import SessionLocal, ReferenceText
 
-# Настройки для снижения нагрузки на сервера
-REQUEST_DELAY = 1.5
+# ============================================================
+# НАСТРОЙКИ
+# ============================================================
+
+REQUEST_DELAY = 1.5  # Задержка между запросами
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+MAX_TEXT_LENGTH = 8000  # Максимальная длина текста для сохранения
 
 
-class TextCollector:
+# ============================================================
+# КЛАСС ДЛЯ ЗАГРУЗКИ
+# ============================================================
+
+class TextDownloader:
     def __init__(self):
         self.db = SessionLocal()
         self.total_added = 0
+        self.total_skipped = 0
 
-    def add_text(self, title: str, source: str, content: str, category: str = "general") -> bool:
-        """Добавляет текст в базу с проверкой дубликатов"""
-        if not content or len(content) < 200:
+    def add_text(self, title: str, source: str, content: str) -> bool:
+        """Добавляет текст в базу без категорий"""
+        if not content or len(content) < 100:
             return False
+
+        # Обрезаем текст если слишком длинный
+        if len(content) > MAX_TEXT_LENGTH:
+            content = content[:MAX_TEXT_LENGTH]
 
         content_hash = hashlib.sha256(content.encode('utf-8')).hexdigest()
 
+        # Проверяем дубликаты
         existing = self.db.query(ReferenceText).filter(
             ReferenceText.content_hash == content_hash
         ).first()
 
         if existing:
-            print(f"⏭️ Уже есть: {title[:50]}...")
+            self.total_skipped += 1
+            print(f"⏭️ Пропущен (дубликат): {title[:40]}...")
             return False
 
+        # Создаем запись без категории
         ref = ReferenceText(
             title=title[:200],
             source=source[:200],
@@ -37,330 +66,296 @@ class TextCollector:
         )
         self.db.add(ref)
         self.total_added += 1
-        print(f"➕ Добавлен: {title[:60]}... ({len(content)} символов)")
+        print(f"✅ Добавлен: {title[:50]}... ({len(content)} символов)")
         return True
 
-    def commit(self):
+    def save(self):
+        """Сохраняет изменения в базу"""
         self.db.commit()
-        print(f"\n✅ Добавлено {self.total_added} новых текстов!")
+        print("\n" + "=" * 60)
+        print(f"📊 ИТОГО ДОБАВЛЕНО: {self.total_added} текстов")
+        print(f"⏭️ ПРОПУЩЕНО (дубликаты): {self.total_skipped}")
+        print("=" * 60)
         self.db.close()
 
 
 # ============================================================
-# 1. ЗАГРУЗКА С ARXIV (НАУЧНЫЕ СТАТЬИ)
+# 1. КЛАССИЧЕСКАЯ ЛИТЕРАТУРА (Project Gutenberg)
 # ============================================================
 
-def fetch_arxiv_papers(collector: TextCollector, topic: str = "cs", max_results: int = 20):
-    """
-    Загружает научные статьи из arXiv по темам
-    Статьи на английском, но это отличный источник для сравнения
-    """
-    print(f"\n📚 Загрузка статей из arXiv по теме: {topic}...")
+def download_classics(downloader: TextDownloader, limit: int = 8):
+    """Скачивает классические книги"""
+    print("\n📚 Загрузка классической литературы...")
 
-    categories = {
-        "cs": "computer_science",
-        "math": "mathematics",
-        "physics": "physics",
-        "q-bio": "quantitative_biology",
-        "q-fin": "quantitative_finance",
-        "stat": "statistics"
-    }
-
-    base_url = "http://export.arxiv.org/api/query"
-    query = f"cat:{topic}*"
-    params = {
-        "search_query": query,
-        "start": 0,
-        "max_results": max_results,
-        "sortBy": "submittedDate",
-        "sortOrder": "descending"
-    }
-
-    try:
-        response = requests.get(base_url, params=params, timeout=30)
-        response.raise_for_status()
-
-        # Парсим XML
-        root = ET.fromstring(response.text)
-        ns = {"atom": "http://www.w3.org/2005/Atom"}
-
-        for entry in root.findall("atom:entry", ns):
-            title = entry.find("atom:title", ns)
-            abstract = entry.find("atom:summary", ns)
-
-            if abstract is not None and abstract.text:
-                # Берем только аннотацию (abstract) как эталон
-                content = abstract.text
-                if len(content) > 300:
-                    collector.add_text(
-                        title=f"arXiv: {title.text[:80] if title else 'Без названия'}",
-                        source=f"arXiv ({topic})",
-                        content=content,
-                        category="scientific"
-                    )
-            time.sleep(REQUEST_DELAY)
-
-    except Exception as e:
-        print(f"⚠️ Ошибка загрузки arXiv: {e}")
-
-
-# ============================================================
-# 2. ЗАГРУЗКА ИЗ КИБЕРЛЕНИНКИ (РУССКИЕ НАУЧНЫЕ СТАТЬИ)
-# ============================================================
-
-def fetch_cyberleninka(collector: TextCollector, query: str = "наука", max_results: int = 10):
-    """
-    Загружает русские научные статьи из КиберЛенинки
-    """
-    print(f"\n📚 Загрузка статей из КиберЛенинки по запросу: {query}...")
-
-    # Используем поиск через API КиберЛенинки
-    base_url = "https://cyberleninka.ru/api/v1/search"
-    params = {
-        "q": query,
-        "size": max_results,
-        "sort": "relevance"
-    }
-
-    try:
-        response = requests.get(base_url, params=params, timeout=30)
-        response.raise_for_status()
-        data = response.json()
-
-        for item in data.get("results", []):
-            # Получаем аннотацию
-            if "annotation" in item and item["annotation"]:
-                content = item["annotation"]
-                if len(content) > 200:
-                    collector.add_text(
-                        title=f"{item.get('title', 'Без названия')[:80]}",
-                        source=f"КиберЛенинка: {item.get('authors', '')}",
-                        content=content,
-                        category="scientific"
-                    )
-            time.sleep(REQUEST_DELAY)
-
-    except Exception as e:
-        print(f"⚠️ Ошибка загрузки КиберЛенинки: {e}")
-        print("   Возможно, API изменился. Используйте ручной поиск.")
-
-
-# ============================================================
-# 3. ЗАГРУЗКА ИЗ OPEN-DOC (НАУЧНЫЕ СТАТЬИ + ОТЧЕТЫ)
-# ============================================================
-
-def fetch_open_doc(collector: TextCollector):
-    """
-    Загружает научные статьи, техническую документацию, финансовые отчеты и юридические документы
-    Использует датасет open-doc с GitHub
-    """
-    print("\n📚 Загрузка документов из Open-Doc...")
-
-    # Примеры документов для загрузки (можно расширить)
-    sample_docs = [
-        {
-            "title": "Диагностика и лечение эндогенного гиперкортицизма (научная статья)",
-            "source": "Open-Doc / PubMed",
-            "content": """
-            Эндогенный гиперкортицизм (синдром Кушинга) представляет собой тяжелое эндокринное заболевание,
-            обусловленное хронической избыточной секрецией кортизола. Диагностика основывается на 
-            определении уровня кортизола в суточной моче, проведении малой дексаметазоновой пробы и 
-            определении уровня АКТГ. Лечение зависит от этиологии заболевания и может включать 
-            хирургическое удаление опухоли, лучевую терапию или медикаментозную коррекцию.
-            """
-        },
-        {
-            "title": "Применение методов машинного обучения в медицине (научный обзор)",
-            "source": "Open-Doc / AI in Medicine",
-            "content": """
-            Методы машинного обучения находят широкое применение в современной медицине для диагностики,
-            прогнозирования и персонализации лечения. Нейросетевые алгоритмы демонстрируют высокую точность
-            при анализе медицинских изображений, обработке геномных данных и прогнозировании исходов
-            заболеваний. Основными вызовами остаются интерпретируемость моделей и качество данных.
-            """
-        },
-        {
-            "title": "Годовой отчет компании (финансовый анализ)",
-            "source": "Open-Doc / Corporate Finance",
-            "content": """
-            Годовой отчет содержит комплексный анализ финансово-хозяйственной деятельности предприятия.
-            Включает бухгалтерский баланс, отчет о финансовых результатах, отчет о движении денежных средств.
-            Проводится анализ ликвидности, платежеспособности, рентабельности и деловой активности.
-            На основе анализа разрабатываются рекомендации по повышению эффективности управления.
-            """
-        },
-        {
-            "title": "Техническая документация по эксплуатации оборудования",
-            "source": "Open-Doc / Technical Documentation",
-            "content": """
-            Руководство по эксплуатации содержит подробное описание технических характеристик оборудования,
-            правил установки, настройки и обслуживания. Включает разделы по технике безопасности,
-            диагностике неисправностей и планово-предупредительным ремонтам. Соблюдение регламентов
-            обеспечивает надежную и безопасную работу оборудования.
-            """
-        },
-        {
-            "title": "Правовой анализ договорных отношений (юридический документ)",
-            "source": "Open-Doc / Legal Documents",
-            "content": """
-            Анализ договорных отношений включает оценку правомерности условий договора, проверку
-            соответствия требованиям законодательства, выявление рисков для сторон. Особое внимание
-            уделяется вопросам ответственности, форс-мажорных обстоятельств, порядка разрешения споров.
-            По результатам анализа разрабатываются рекомендации по оптимизации договорной работы.
-            """
-        }
+    books = [
+        {"id": "1342", "title": "Pride and Prejudice - Jane Austen"},
+        {"id": "11", "title": "Alice in Wonderland - Lewis Carroll"},
+        {"id": "74", "title": "Huckleberry Finn - Mark Twain"},
+        {"id": "84", "title": "Frankenstein - Mary Shelley"},
+        {"id": "1661", "title": "The Picture of Dorian Gray - Oscar Wilde"},
+        {"id": "345", "title": "Dracula - Bram Stoker"},
+        {"id": "98", "title": "A Tale of Two Cities - Charles Dickens"},
+        {"id": "2701", "title": "Moby Dick - Herman Melville"},
+        {"id": "1400", "title": "Great Expectations - Charles Dickens"},
+        {"id": "163", "title": "War and Peace - Leo Tolstoy"},
     ]
 
-    for doc in sample_docs:
-        collector.add_text(
-            title=doc["title"],
-            source=doc["source"],
-            content=doc["content"],
-            category="scientific"
-        )
-        time.sleep(0.5)
+    for book in books[:limit]:
+        try:
+            book_id = book["id"]
+            title = book["title"]
+
+            # Пробуем разные форматы URL
+            urls = [
+                f"https://www.gutenberg.org/files/{book_id}/{book_id}-0.txt",
+                f"https://www.gutenberg.org/files/{book_id}/{book_id}.txt",
+                f"https://www.gutenberg.org/cache/epub/{book_id}/pg{book_id}.txt"
+            ]
+
+            text = None
+            for url in urls:
+                try:
+                    response = requests.get(url, timeout=30)
+                    if response.status_code == 200:
+                        text = response.text
+                        break
+                except:
+                    continue
+
+            if text:
+                # Очищаем текст
+                text = re.sub(r'\r\n', '\n', text)
+                text = re.sub(r'\n\s*\n', '\n\n', text)
+
+                # Ищем начало книги
+                start_markers = ["*** START OF", "***START OF", "Produced by", "CHAPTER"]
+                start = -1
+                for marker in start_markers:
+                    pos = text.find(marker)
+                    if pos != -1:
+                        start = pos
+                        break
+
+                if start != -1:
+                    text = text[start:]
+                    text = text[:MAX_TEXT_LENGTH]
+
+                downloader.add_text(
+                    title=title,
+                    source=f"Project Gutenberg - {book_id}",
+                    content=text
+                )
+            else:
+                print(f"⚠️ Не удалось скачать: {title}")
+
+            time.sleep(REQUEST_DELAY)
+
+        except Exception as e:
+            print(f"⚠️ Ошибка: {title} - {e}")
 
 
 # ============================================================
-# 4. ЗАГРУЗКА ИЗ ВИКИПЕДИИ (НАУЧНЫЕ И ОБРАЗОВАТЕЛЬНЫЕ СТАТЬИ)
+# 2. НАУЧНЫЕ СТАТЬИ (arXiv)
 # ============================================================
 
-def fetch_wikipedia_scientific(collector: TextCollector):
-    """
-    Загружает научные и образовательные статьи из Википедии
-    """
-    print("\n📚 Загрузка образовательных статей из Википедии...")
+def download_arxiv(downloader: TextDownloader, limit: int = 5):
+    """Скачивает научные статьи из arXiv"""
+    print("\n🔬 Загрузка научных статей из arXiv...")
 
-    # Расширенный список научных тем
-    scientific_topics = [
-        ("Квантовая механика", "Физика"),
-        ("Теория относительности", "Физика"),
-        ("ДНК", "Биология"),
-        ("Эволюция", "Биология"),
-        ("Искусственный интеллект", "Информатика"),
-        ("Машинное обучение", "Информатика"),
-        ("Большие данные", "Информатика"),
-        ("Нейронные сети", "Информатика"),
-        ("Глобальное потепление", "Экология"),
-        ("Возобновляемая энергия", "Экология"),
-        ("Вакцинация", "Медицина"),
-        ("Генетика", "Биология"),
-        ("Космология", "Физика"),
-        ("Экономический рост", "Экономика"),
-        ("Психоанализ", "Психология")
+    topics = ["cs.AI", "cs.LG", "physics", "q-bio", "math"]
+
+    for topic in topics:
+        try:
+            url = f"http://export.arxiv.org/api/query?search_query=cat:{topic}&max_results={limit}&sortBy=submittedDate"
+            response = requests.get(url, timeout=30)
+
+            if response.status_code == 200:
+                import xml.etree.ElementTree as ET
+                root = ET.fromstring(response.content)
+                ns = {"atom": "http://www.w3.org/2005/Atom"}
+
+                for entry in root.findall("atom:entry", ns):
+                    title_elem = entry.find("atom:title", ns)
+                    abstract = entry.find("atom:summary", ns)
+
+                    if abstract is not None and abstract.text:
+                        title = title_elem.text[:80] if title_elem is not None else f"arXiv {topic}"
+                        content = abstract.text
+
+                        if len(content) > 200:
+                            downloader.add_text(
+                                title=f"arXiv: {title}",
+                                source=f"arXiv ({topic})",
+                                content=content
+                            )
+            time.sleep(REQUEST_DELAY)
+
+        except Exception as e:
+            print(f"⚠️ Ошибка arXiv ({topic}): {e}")
+
+
+# ============================================================
+# 3. ВИКИПЕДИЯ
+# ============================================================
+
+def download_wikipedia(downloader: TextDownloader):
+    """Скачивает статьи из Википедии"""
+    print("\n🌍 Загрузка статей из Wikipedia...")
+
+    topics = [
+        "Artificial intelligence", "Machine learning", "Data science",
+        "Computer science", "Physics", "Chemistry", "Biology",
+        "Medicine", "Economics", "Philosophy", "Psychology",
+        "Climate change", "Space exploration", "Genetics",
+        "Evolution", "Neural network", "Cryptography",
+        "Quantum mechanics", "Theory of relativity"
     ]
 
     try:
         import wikipediaapi
-
         wiki = wikipediaapi.Wikipedia(
-            user_agent='TextCollector/1.0 (research)',
-            language='ru',
+            user_agent='TextDownloader/1.0',
+            language='en',
             extract_format=wikipediaapi.ExtractFormat.WIKI
         )
 
-        for topic, category in scientific_topics:
+        for topic in topics:
             try:
                 page = wiki.page(topic)
                 if page.exists():
-                    # Берем первые 4000 символов
-                    content = page.text[:4000]
+                    content = page.text[:MAX_TEXT_LENGTH]
                     if len(content) > 500:
-                        collector.add_text(
-                            title=f"Википедия: {topic} ({category})",
-                            source=f"Wikipedia / {category}",
-                            content=content,
-                            category="scientific"
+                        downloader.add_text(
+                            title=f"Wikipedia: {topic}",
+                            source=f"https://en.wikipedia.org/wiki/{topic.replace(' ', '_')}",
+                            content=content
                         )
-                        print(f"   📖 Загружена статья: {topic}")
                     time.sleep(REQUEST_DELAY)
             except Exception as e:
-                print(f"⚠️ Ошибка загрузки {topic}: {e}")
+                print(f"⚠️ Ошибка {topic}: {e}")
 
     except ImportError:
-        print("⚠️ Wikipedia-API не установлен. Установите: pip install wikipedia-api")
+        print("⚠️ Установите: pip install wikipedia-api")
 
 
 # ============================================================
-# 5. ЗАГРУЗКА ТЕКСТОВ ИЗ ИЗВЕСТНЫХ НАУЧНЫХ ИСТОЧНИКОВ
+# 4. НОВОСТИ (RSS)
 # ============================================================
 
-def fetch_scientific_texts(collector: TextCollector):
-    """
-    Загружает готовые научные тексты из открытых источников
-    """
-    print("\n📚 Загрузка научных текстов...")
+def download_news(downloader: TextDownloader, limit: int = 3):
+    """Скачивает новостные статьи"""
+    print("\n📰 Загрузка новостей...")
 
-    # Научные тексты на русском языке (отрывки)
-    scientific_samples = [
+    feeds = [
+        ("http://feeds.bbci.co.uk/news/rss.xml", "BBC News"),
+        ("https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", "NY Times"),
+        ("https://feeds.npr.org/1001/rss.xml", "NPR"),
+    ]
+
+    import xml.etree.ElementTree as ET
+
+    for feed_url, source in feeds:
+        try:
+            response = requests.get(feed_url, timeout=30)
+            if response.status_code == 200:
+                root = ET.fromstring(response.content)
+                items = root.findall(".//item")
+
+                for item in items[:limit]:
+                    title = item.find("title")
+                    description = item.find("description")
+                    link = item.find("link")
+
+                    if description is not None and description.text:
+                        content = description.text
+                        # Удаляем HTML теги
+                        content = re.sub(r'<[^>]+>', '', content)
+                        content = re.sub(r'&[a-z]+;', ' ', content)
+
+                        if len(content) > 200:
+                            title_text = title.text if title is not None else "News"
+                            downloader.add_text(
+                                title=f"{source}: {title_text[:60]}",
+                                source=f"{source} - News",
+                                content=content
+                            )
+            time.sleep(REQUEST_DELAY)
+
+        except Exception as e:
+            print(f"⚠️ Ошибка новостей {source}: {e}")
+
+
+# ============================================================
+# 5. РУССКАЯ КЛАССИКА (ОТРЫВКИ)
+# ============================================================
+
+def download_russian_classics(downloader: TextDownloader):
+    """Добавляет отрывки русской классики"""
+    print("\n📖 Загрузка русской классики...")
+
+    russian_texts = [
         {
-            "title": "Основы научного метода",
-            "source": "Учебный материал",
+            "title": "Война и мир - Лев Толстой",
+            "source": "Русская классика",
             "content": """
-            Научный метод представляет собой систему познавательных принципов и методов, 
-            позволяющих получать объективное знание о действительности. Он включает этапы: 
-            наблюдение, формулирование гипотезы, эксперимент, анализ результатов и выводы. 
-            Ключевыми принципами являются объективность, проверяемость, системность и 
-            критичность мышления. В современной науке особое значение приобретает 
-            междисциплинарный подход.
-            """
+Война и мир — роман-эпопея Льва Николаевича Толстого, 
+описывающий русское общество в эпоху войн против Наполеона.
+В центре повествования — судьбы нескольких дворянских семей, 
+их взаимоотношения, любовь, поиски смысла жизни и философские размышления 
+о роли личности в истории. Роман охватывает период с 1805 по 1812 год 
+и включает масштабные батальные сцены и глубокий психологизм.
+"""
         },
         {
-            "title": "Искусственный интеллект и нейросети",
-            "source": "Учебный материал",
+            "title": "Преступление и наказание - Федор Достоевский",
+            "source": "Русская классика",
             "content": """
-            Искусственный интеллект (ИИ) — это область информатики, занимающаяся созданием 
-            систем, способных решать интеллектуальные задачи. Нейронные сети — один из 
-            ключевых подходов в ИИ, моделирующий работу биологических нейронов. Глубокое 
-            обучение позволяет нейросетям самостоятельно выделять признаки из данных, 
-            что дает возможность решать задачи распознавания образов, обработки текстов 
-            и прогнозирования. Развитие ИИ требует учета этических аспектов и контроля.
-            """
+Преступление и наказание — социально-психологический роман 
+Фёдора Михайловича Достоевского. Главный герой, Родион Раскольников, 
+разрабатывает теорию о делении людей на обыкновенных и необыкновенных, 
+решаясь на убийство. Роман исследует темы вины, искупления, 
+нравственных границ и поиска смысла существования.
+"""
         },
         {
-            "title": "Биотехнологии в медицине",
-            "source": "Учебный материал",
+            "title": "Мастер и Маргарита - Михаил Булгаков",
+            "source": "Русская классика",
             "content": """
-            Биотехнологии открывают новые возможности в диагностике и лечении заболеваний. 
-            Генетическое тестирование позволяет выявлять предрасположенность к наследственным 
-            болезням. Клеточные технологии, включая стволовые клетки, используются для 
-            регенеративной медицины. Генная терапия направлена на коррекцию генетических 
-            нарушений. Этические вопросы использования биотехнологий требуют серьезного 
-            осмысления и регулирования.
-            """
+Мастер и Маргарита — роман Михаила Афанасьевича Булгакова, 
+в котором переплетаются сатирическая повесть о Москве 1930-х годов, 
+евангельский сюжет о Понтии Пилате и любовная линия Мастера и Маргариты. 
+Воланд со своей свитой посещает столицу, обнажая пороки советского общества.
+"""
         },
         {
-            "title": "Экологические проблемы и устойчивое развитие",
-            "source": "Учебный материал",
+            "title": "Евгений Онегин - Александр Пушкин",
+            "source": "Русская классика",
             "content": """
-            Устойчивое развитие предполагает гармонизацию экономических, социальных и 
-            экологических аспектов. Глобальные экологические проблемы, включая изменение 
-            климата, загрязнение окружающей среды и потерю биоразнообразия, требуют 
-            коллективных решений. Переход к зеленой экономике, использование возобновляемых 
-            источников энергии и внедрение циркулярных моделей производства являются 
-            основными направлениями достижения устойчивого развития.
-            """
+Евгений Онегин — роман в стихах Александра Сергеевича Пушкина, 
+написанный в 1823-1831 годах. Главный герой — молодой дворянин, 
+разочарованный в жизни, который уезжает в деревню, где знакомится 
+с Татьяной Лариной. Роман считается энциклопедией русской жизни 
+и одним из важнейших произведений русской литературы.
+"""
         },
         {
-            "title": "Финансовые рынки и инвестиции",
-            "source": "Учебный материал",
+            "title": "Мертвые души - Николай Гоголь",
+            "source": "Русская классика",
             "content": """
-            Финансовые рынки представляют собой систему экономических отношений, связанных 
-            с перераспределением капитала. Инвестиционная деятельность включает анализ 
-            рисков и доходности финансовых инструментов. Портфельное инвестирование 
-            основано на диверсификации активов для оптимизации соотношения риска и 
-            доходности. Рыночная волатильность создает как возможности, так и угрозы 
-            для инвесторов, что требует профессионального подхода к управлению.
-            """
+Мертвые души — поэма Николая Васильевича Гоголя, 
+опубликованная в 1842 году. Главный герой Чичиков путешествует по России, 
+скупая мертвые души крестьян у помещиков. Сатирическое изображение 
+помещиков и чиновников, яркие характеры и глубокий психологизм 
+делают произведение классикой русской литературы.
+"""
         }
     ]
 
-    for sample in scientific_samples:
-        collector.add_text(
-            title=sample["title"],
-            source=sample["source"],
-            content=sample["content"],
-            category="scientific"
+    for text in russian_texts:
+        downloader.add_text(
+            title=text["title"],
+            source=text["source"],
+            content=text["content"]
         )
         time.sleep(0.5)
 
@@ -370,50 +365,34 @@ def fetch_scientific_texts(collector: TextCollector):
 # ============================================================
 
 def main():
-    print("=" * 70)
-    print("🔬 СБОР НАУЧНЫХ СТАТЕЙ, ОТЧЕТОВ И ДОКУМЕНТОВ")
-    print("=" * 70)
-    print("ℹ️  Это займет некоторое время...")
+    print("=" * 60)
+    print("📚 СКАЧИВАНИЕ ТЕКСТОВ В БАЗУ")
+    print("=" * 60)
+    print("ℹ️  Будут скачаны тексты из разных источников")
+    print("")
 
-    collector = TextCollector()
+    downloader = TextDownloader()
 
-    # 1. Научные статьи (разные источники)
-    print("\n" + "=" * 70)
-    print("📚 ЭТАП 1: Научные статьи")
-    print("=" * 70)
+    # 1. Русская классика (быстро, локально)
+    download_russian_classics(downloader)
 
-    # arXiv - научные статьи (5 разных тем, 5 статей каждая)
-    for topic in ["cs.AI", "cs.LG", "physics", "q-bio", "math"]:
-        fetch_arxiv_papers(collector, topic, max_results=5)
+    # 2. Классическая литература (Gutenberg)
+    download_classics(downloader, limit=5)
 
-    # КиберЛенинка - русские статьи
-    fetch_cyberleninka(collector, "наука", max_results=5)
-    fetch_cyberleninka(collector, "медицина", max_results=5)
-    fetch_cyberleninka(collector, "технологии", max_results=5)
+    # 3. Научные статьи (arXiv)
+    download_arxiv(downloader, limit=3)
 
-    # 2. Научно-образовательные материалы
-    print("\n" + "=" * 70)
-    print("📚 ЭТАП 2: Образовательные материалы")
-    print("=" * 70)
+    # 4. Википедия
+    download_wikipedia(downloader)
 
-    fetch_wikipedia_scientific(collector)
-    fetch_scientific_texts(collector)
-
-    # 3. Специализированные документы (отчеты, техническая документация)
-    print("\n" + "=" * 70)
-    print("📚 ЭТАП 3: Специализированные документы")
-    print("=" * 70)
-
-    fetch_open_doc(collector)
+    # 5. Новости
+    download_news(downloader, limit=2)
 
     # Сохраняем все в базу
-    collector.commit()
+    downloader.save()
 
-    print("\n" + "=" * 70)
-    print("🎉 СБОР ЗАВЕРШЕН!")
-    print("=" * 70)
-    print("📊 Теперь у вас есть научные статьи, отчеты и документы")
-    print("   для сравнения загружаемых файлов!")
+    print("\n🎉 ЗАВЕРШЕНО!")
+    print(f"📊 Всего в базе: {downloader.total_added} новых текстов")
 
 
 if __name__ == "__main__":

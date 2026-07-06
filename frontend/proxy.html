@@ -1,6 +1,4 @@
-cd C:\Users\bibon\PycharmProjects\plagiarism_checker\frontend
 
-@'
 <!DOCTYPE html>
 <html>
 <head>
@@ -22,7 +20,7 @@ cd C:\Users\bibon\PycharmProjects\plagiarism_checker\frontend
         Нажми кнопку для проверки
     </div>
     <hr>
-    <h3>📤 Тест загрузки файла</h3>
+    <h3>Тест загрузки файла</h3>
     <input type="file" id="fileInput">
     <button onclick="uploadFile()">Загрузить</button>
     <div id="uploadResult" style="margin-top:10px;padding:15px;background:#f5f5f5;border-radius:5px;"></div>
@@ -49,7 +47,7 @@ cd C:\Users\bibon\PycharmProjects\plagiarism_checker\frontend
         }
 
         async function checkDocuments() {
-            showResult('⏳ Проверка...', true);
+            showResult('Проверка...', true);
             try {
                 const response = await fetch(`${API_URL}/api/documents`);
                 const data = await response.json();
@@ -74,7 +72,7 @@ cd C:\Users\bibon\PycharmProjects\plagiarism_checker\frontend
             formData.append('file', file);
             formData.append('file_type', 'document');
 
-            resultDiv.innerHTML = '⏳ Загрузка...';
+            resultDiv.innerHTML = 'Загрузка...';
             resultDiv.style.background = '#fff3e0';
 
             try {
