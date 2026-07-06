@@ -75,18 +75,6 @@
 ### API Документация (Swagger)
 ![API Документация](screenshots/api_docs.png)
 
----
 
-## Установка и запуск
-
-### Требования
-- Python 3.12+
-- Pip (менеджер пакетов)
-
-### Шаг 1: Клонируйте репозиторий
-
-```bash
-git clone https://github.com/your-username/plagiarism-detector.git
-cd plagiarism-detector
 
 
