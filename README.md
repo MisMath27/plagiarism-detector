@@ -64,6 +64,19 @@
 
 ---
 
+## 📸 Скриншоты
+
+### Главная страница
+![Главная страница](screenshots/main_page.png)
+
+### Результаты анализа
+![Результаты анализа](screenshots/results.png)
+
+### API Документация (Swagger)
+![API Документация](screenshots/api_docs.png)
+
+---
+
 ## Установка и запуск
 
 ### Требования
@@ -75,3 +88,5 @@
 ```bash
 git clone https://github.com/your-username/plagiarism-detector.git
 cd plagiarism-detector
+
+
