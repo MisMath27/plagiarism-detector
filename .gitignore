@@ -65,3 +65,10 @@ dmypy.json
 
 .idea/
 *.iml
+
+# Предвычисленные индексы
+*.pkl
+tfidf_index.pkl
+
+# Дублирующая вложенная папка uploads
+backend/backend/uploads/

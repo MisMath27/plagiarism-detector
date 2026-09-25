@@ -1,7 +1,7 @@
 ﻿
 console.log("Подключение к бэкенду...");
 
-const API_URL = 'http://127.0.0.1:8000/api';
+const API_URL = ' /api';
 
 let history = JSON.parse(localStorage.getItem("history") || "[]");
 let selectedFile = null;
@@ -319,7 +319,7 @@ console.log(`API URL: ${API_URL}`);
 
 async function checkBackend() {
     try {
-        const response = await fetch('http://127.0.0.1:8000/health');
+        const response = await fetch('/health');
         if (response.ok) {
             console.log('Бэкенд доступен!');
         } else {

@@ -101,137 +101,88 @@ class TextAnalyzer:
 
 
 
-    def calculate_tfidf_similarity(self, text: str, corpus: List[str]) -> Tuple[float, List[Dict]]:
-        """
-        Вычисляет сходство с использованием TF-IDF и косинусного расстояния
-        """
-        if not corpus:
+def calculate_tfidf_similarity(self, text: str, corpus: List[str]) -> Tuple[float, List[Dict]]:
+    """
+    Использует предвычисленный TF-IDF индекс (если доступен).
+    Иначе — fallback на старый метод.
+    """
+    from .indexer import get_index
+    
+    index = get_index()
+    
+    # Если индекс не загружен — пробуем загрузить
+    if index.matrix is None:
+        if not index.load():
+            # Fallback: старый метод
+            return self._calculate_tfidf_fallback(text, corpus)
+    
+    # Используем индекс
+    try:
+        scores, top_indices = index.query(text, top_k=10)
+        
+        if len(scores) == 0:
             return 0.0, []
-
-        # Объединяем все тексты
-        all_texts = [text] + corpus
-
-        try:
-            tfidf_matrix = self.vectorizer.fit_transform(all_texts)
-            self.is_fitted = True
-        except Exception as e:
-            print(f"Ошибка TF-IDF: {e}")
-            return 0.0, []
-
-        similarities = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:])
-
-        if similarities.size == 0:
-            return 0.0, []
-
-        max_sim = float(np.max(similarities)) if similarities.size > 0 else 0
-
-        top_indices = np.argsort(similarities[0])[-3:][::-1]
+        
+        max_sim = float(np.max(scores)) if len(scores) > 0 else 0.0
+        
         top_matches = []
         for idx in top_indices:
-            score = float(similarities[0][idx])
-            if score > 0.1:
+            score = float(scores[idx])
+            if score > 0.05:
+                meta = index.text_meta[idx] if idx < len(index.text_meta) else {}
                 top_matches.append({
                     'index': idx,
-                    'score': round(score * 100, 2)
+                    'score': round(score * 100, 2),
+                    'title': meta.get('title', 'Unknown'),
+                    'source': meta.get('source', 'Unknown'),
                 })
-
+        
         return max_sim * 100, top_matches
-
-    def calculate_hybrid_similarity(self, text: str, corpus: List[str]) -> Dict:
-        """
-        Вычисляет сходство с использованием гибридного подхода
-        """
-        if not corpus or len(corpus) == 0:
-            clean_text = self.preprocess_text(text)
-            words = self.get_words(clean_text)
-            words_filtered = self.remove_stopwords(words)
-
-            unique_percentage = 100.0
-            if words_filtered:
-                word_freq = Counter(words_filtered)
-                unique_words = sum(1 for w, c in word_freq.items() if c == 1)
-                unique_percentage = (unique_words / len(words_filtered)) * 100 if len(words_filtered) > 0 else 100.0
-
-            sentences = self.get_sentences(text)
-
-            return {
-                'similarity_score': 0.0,
-                'jaccard_score': 0.0,
-                'tfidf_score': 0.0,
-                'hybrid_score': 0.0,
-                'top_matches': [],
-                'unique_phrases_percentage': round(unique_percentage, 2),
-                'total_sentences': len(sentences),
-                'matched_sources': [],
-                'method_details': 'Нет эталонных текстов в базе!'
-            }
-
-        jaccard_scores = []
-        for ref_text in corpus[:10]:
-            try:
-                score = self.calculate_jaccard_similarity(text, ref_text)
-                if score is not None and not np.isnan(score):
-                    jaccard_scores.append(score)
-            except Exception as e:
-                print(f"Jaccard error: {e}")
-                continue
-
-        avg_jaccard = np.mean(jaccard_scores) if jaccard_scores else 0.0
-        if np.isnan(avg_jaccard):
-            avg_jaccard = 0.0
-            print("DEBUG: avg_jaccard was NaN, set to 0.0")
-
-        try:
-            tfidf_score, top_matches = self.calculate_tfidf_similarity(text, corpus[:50])
-            if np.isnan(tfidf_score):
-                tfidf_score = 0.0
-                print("DEBUG: tfidf_score was NaN, set to 0.0")
-        except Exception as e:
-            print(f"TF-IDF error: {e}")
-            tfidf_score = 0.0
-            top_matches = []
-
-        hybrid_score = (self.jaccard_weight * avg_jaccard +
-                        self.tfidf_weight * tfidf_score)
-
-        if np.isnan(hybrid_score):
-            hybrid_score = 0.0
-            print("DEBUG: hybrid_score was NaN, set to 0.0")
-
-        clean_text = self.preprocess_text(text)
-        words = self.get_words(clean_text)
-        words_filtered = self.remove_stopwords(words)
-
-        unique_percentage = 100.0
-        if words_filtered:
-            word_freq = Counter(words_filtered)
-            unique_words = sum(1 for w, c in word_freq.items() if c == 1)
-            unique_percentage = (unique_words / len(words_filtered)) * 100 if len(words_filtered) > 0 else 100.0
-
-        if np.isnan(unique_percentage):
-            unique_percentage = 100.0
-
-        sentences = self.get_sentences(text)
-
-        matched_sources = []
-        if hybrid_score > 20:
-            for i, match in enumerate(top_matches[:3]):
-                if match.get('score', 0) > 20:
-                    matched_sources.append(f"source_{i + 1}.txt ({match['score']}%)")
-
-        return {
-            'similarity_score': round(hybrid_score, 2),
-            'jaccard_score': round(avg_jaccard, 2),
-            'tfidf_score': round(tfidf_score, 2),
-            'hybrid_score': round(hybrid_score, 2),
-            'top_matches': top_matches[:5],
-            'unique_phrases_percentage': round(unique_percentage, 2),
-            'total_sentences': len(sentences),
-            'matched_sources': matched_sources,
-            'method_details': f"Гибридный анализ (Jaccard: {self.jaccard_weight * 100}%, TF-IDF: {self.tfidf_weight * 100}%)"
-        }
+    except Exception as e:
+        print(f"Ошибка при использовании индекса: {e}")
+        return self._calculate_tfidf_fallback(text, corpus)
 
 
+def _calculate_tfidf_fallback(self, text: str, corpus: List[str]) -> Tuple[float, List[Dict]]:
+    """Старый метод — считает TF-IDF на лету (для fallback)"""
+    if not corpus:
+        return 0.0, []
+    
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+    
+    all_texts = [text] + corpus
+    vectorizer = TfidfVectorizer(
+        max_features=10000,
+        min_df=2,
+        max_df=0.8,
+        sublinear_tf=True,
+        ngram_range=(1, 2),
+    )
+    
+    try:
+        tfidf_matrix = vectorizer.fit_transform(all_texts)
+    except Exception as e:
+        print(f"Ошибка TF-IDF: {e}")
+        return 0.0, []
+    
+    similarities = cosine_similarity(tfidf_matrix[0:1], tfidf_matrix[1:])
+    if similarities.size == 0:
+        return 0.0, []
+    
+    max_sim = float(np.max(similarities))
+    top_indices = np.argsort(similarities[0])[-3:][::-1]
+    
+    top_matches = []
+    for idx in top_indices:
+        score = float(similarities[0][idx])
+        if score > 0.1:
+            top_matches.append({
+                'index': idx,
+                'score': round(score * 100, 2)
+            })
+    
+    return max_sim * 100, top_matches
 
     def detect_ai_content(self, text: str) -> Dict:
         """
